@@ -32,9 +32,7 @@ notNumeric
 # "user_name"      "cvtd_timestamp" "new_window"     "classe" 
 unique(trainDataSub[,"new_window"])
 #no yes
-# trainDataSub$new_window_no[trainDataSub$new_window == "yes"]=1
-# trainDataSub$new_window_no[trainDataSub$new_window == "no"]=0
-# table(trainDataSub$new_window,trainDataSub$new_window_no)
+
 trainDataSub = trainDataSub[,-which(names(trainDataSub) %in% c("user_name","cvtd_timestamp","new_window"))]
 dim(trainDataSub)
 #19622 57
@@ -57,16 +55,6 @@ table(trainDataSub$classe)
 #delete the var for row numbers
 trainDataSub = trainDataSub[,-which(colnames(trainDataSub) %in% c("","raw_timestamp_part_1","raw_timestamp_part_2","num_window"))]
 
-# set.seed(12321)
-# inTrain = createDataPartition(y = trainDataSub$classe,p=0.7,list=FALSE)
-# training = trainDataSub[inTrain,]
-# testing=trainDataSub[-inTrain,]
-# dim(training)
-# [1] 13737   53
-# dim(testing)
-# [1]   5885 53
-
-
 
 ######-------------------------Model_tree--------------------------------#####
 trainDataSub$classe = as.factor(trainDataSub$classe)
@@ -76,6 +64,7 @@ fancyRpartPlot(modFit1$finalModel)
 predict(modFit1,newdata = testData)
 varImp(modFit1)
 save(modFit1,file = "modFit1.RData")
+load("modFit1.RData")
 ######-------------------------Model_treebag--------------------------------#####
 ctrl = trainControl(method = "cv",number = 10)
 modFit2 = train(classe ~ .,method="treebag",data = trainDataSub,trControl = ctrl)
@@ -94,9 +83,10 @@ save(modFit3,file = "modFit3.RData")
 load("modFit3.RData")
 predict(modFit3,newdata = testData)
 ######-------------------------Model_boosting--------------------------------#####
-ctrl = trainControl(method = "cv",number = 3)
+ctrl = trainControl(method = "cv",number = 2)
 modFit4 = train(classe ~ .,method="gbm",data = trainDataSub,trControl = ctrl,verbose=FALSE)
 save(modFit4,file = "modFit4.RData")
+load("modFit4.RData")
 modFit4$finalModel
 modFit4 
 predict(modFit4,newdata= testData)
