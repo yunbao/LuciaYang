@@ -1,0 +1,121 @@
+---
+title: "pml-project-LuciaYang"
+author: "Lucia Yang"
+date: "Saturday, May 23, 2015"
+output: html_document
+---
+
+
+In order to predict classe variable, the first step is to understand the data. Certain variables may have little predictive power. I exclude columns with more than half of the missing values, and I exclude columns of user names, time stamps and new window indicator. There are 52 covariates left. 
+
+```{r}
+setwd("H:/others/Practical Machine Learning/Project")
+library("caret")
+library("pls")
+library("Hmisc")
+library("rattle")
+
+######-------------------------Data Prepare--------------------------------#####
+trainData = read.table("pml-training.csv",na.strings=c("NA",""),
+               header = T,nrows = -1,fill=TRUE,sep=",",strip.white = T, 
+               as.is=T,row.names = NULL,check.names=FALSE )
+#19622*160
+testData = read.table("pml-testing.csv",na.strings=c("NA",""),
+                       header = T,nrows = -1,fill=TRUE,sep=",",strip.white = T, 
+                       as.is=T,row.names = NULL, check.names=FALSE )
+#20*160
+
+#If there are more than 50% NAs in one value, do not include that variable
+trainDataSub = trainData[,(colMeans(is.na(trainData)) <0.5)]
+dim(trainDataSub)
+#[1] 19622    60
+
+
+uniqueV = sapply(trainDataSub,function(x) length(unique(x)))
+dubiousX = names(uniqueV[uniqueV<5])
+dubiousX
+# new_window
+
+notNo = sapply(trainDataSub,function(x) is.numeric(x))
+notNumeric = names(notNo[notNo == FALSE])
+notNumeric
+# "user_name"      "cvtd_timestamp" "new_window"     "classe" 
+unique(trainDataSub[,"new_window"])
+#no yes
+
+trainDataSub = trainDataSub[,-which(names(trainDataSub) %in% c("user_name","cvtd_timestamp","new_window"))]
+dim(trainDataSub)
+#19622 57
+
+table(trainDataSub$classe)
+# A    B    C    D    E 
+# 5580 3797 3422 3216 3607
+
+#delete the var for row numbers
+trainDataSub = trainDataSub[,-which(colnames(trainDataSub) %in% c("","raw_timestamp_part_1","raw_timestamp_part_2","num_window"))]
+
+```
+I build tree model, treebag model, random forest model and gbm model. Firstly, using tree model building as an example. I divide the cleaned pml-training data into 10-fold so that I could use 10-fold cross validation. It is done through "trainControl" function.  Then I build the model using "train" function with "rpart" method in caret package.  
+
+
+```{r}
+trainDataSub$classe = as.factor(trainDataSub$classe)
+load("H:/others/Practical Machine Learning/Project/modFit1.RData")
+# ctrl = trainControl(method = "cv",number = 10)
+# modFit1 = train(classe ~ .,method="rpart",data = trainDataSub,trControl = ctrl)
+varImp(modFit1)
+# save(modFit1,file = "modFit1.RData")
+predict(modFit1,newdata = testData)
+```
+The final model is shown in below graph. 
+```{r,echo=FALSE}
+fancyRpartPlot(modFit1$finalModel)
+```
+The accuracy(1-out-of-sample error) is not impressive  with this model as shown in the below cross validation results. Almost half of the predictions are likely to be wrong.  
+```{r}
+modFit1$resample
+```
+After the tree model, I build treebag model. I also use 10-fold cross validation. The results are shown below. 
+```{r}
+######-------------------------Model_treebag--------------------------------#####
+load("H:/others/Practical Machine Learning/Project/modFit2.RData")
+# ctrl = trainControl(method = "cv",number = 10)
+# modFit2 = train(classe ~ .,method="treebag",data = trainDataSub,trControl = ctrl)
+# modFit2
+# modFit2$results
+modFit2$finalModel
+# save(modFit2,file = "modFit2.RData")
+
+varImp(modFit2)
+```
+The out-of-sample error is much smaller, around 1-2%. 
+```{r}
+modFit2$resample
+```
+Then I further build random forest and gbm models. I use 2-fold cross validation for these two models.
+```{r, cache=FALSE}
+# ctrl = trainControl(method = "cv",number = 2)
+# modFit3 = train(classe ~ .,method="rf",data = trainDataSub,trControl = ctrl,prox = TRUE)
+# save(modFit3,file = "modFit3.RData")
+load("H:\\others\\Practical Machine Learning\\Project\\modFit3.RData")
+# modFit3$finalModel
+
+# ctrl = trainControl(method = "cv",number = 2)
+# modFit4 = train(classe ~ .,method="gbm",data = trainDataSub,trControl = ctrl,verbose=FALSE)
+# save(modFit4,file = "modFit4.RData")
+load("H:\\others\\Practical Machine Learning\\Project\\modFit4.RData")
+# modFit4$finalModel
+```
+Random forest model cross validation results are shown below.
+```{r,cache=FALSE}
+modFit3$resample
+```
+Gbm model cross validation results are as follows.
+```{r,cache=FALSE}
+modFit4$resample
+```
+Random forest model achieves less than 1.2% error and gbm model achieves less than 5% error. 
+  From the cross validation performance, random forest model and treebag model are the best. It is dangerous that the model can be over fitting if we do not perform enough out-of-sample test. Treebag model is selected in the end due to more extensive testing it goes through, and it is not as computational intensive as random forest model. The predicted values for the 20 test cases are below.
+```{r,cache=FALSE}
+predict(modFit2,newdata = testData)
+```
